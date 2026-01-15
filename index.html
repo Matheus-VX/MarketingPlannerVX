@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketing Planner 2026 - Cloud Sync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            overflow-x: hidden;
+        }
+
+        /* Estrutura do Calendário */
+        .calendar-setup {
+            display: grid; 
+            grid-template-columns: repeat(7, minmax(140px, 1fr)); 
+            gap: 1.5px; 
+        }
+
+        .calendar-grid { 
+            border: 1.5px solid #94a3b8; 
+            background-color: #94a3b8; 
+            width: 100%;
+        }
+        .dark .calendar-grid { 
+            border-color: #475569; 
+            background-color: #475569; 
+        }
+
+        .calendar-header-row {
+            padding: 0 1.5px;
+        }
+        
+        .calendar-day { 
+            min-height: 150px; 
+            height: auto; 
+            transition: all 0.2s; 
+            position: relative; 
+            display: flex;
+            flex-direction: column;
+            overflow: visible !important; 
+        }
+        
+        .calendar-day.drag-over {
+            background-color: rgba(99, 102, 241, 0.1) !important;
+            outline: 2px dashed #6366f1;
+            outline-offset: -4px;
+            z-index: 10;
+        }
+
+        .event-tag { 
+            font-size: 0.62rem; 
+            padding: 4px 6px; 
+            border-radius: 6px; 
+            margin: 3px 2px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            font-weight: 800; 
+            transition: all 0.2s ease; 
+            cursor: grab; 
+            border: 1px solid #000000; 
+            border-left-width: 4px;
+            border-right-width: 8px; 
+            border-right-style: solid;
+            line-height: 1.2; 
+            text-transform: uppercase;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            user-select: none;
+            position: relative;
+            opacity: 1 !important; 
+        }
+        
+        .event-tag:hover { 
+            transform: translateY(-1px); 
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
+            z-index: 500; 
+        }
+        
+        .event-tag:active { cursor: grabbing; }
+        .event-tag.dragging { opacity: 0.4 !important; transform: scale(0.95); }
+        .event-tag.dragging .custom-tooltip { display: none !important; }
+
+        .dark .event-tag { border-color: #ffffff; }
+        
+        /* Tarefas Concluídas - VERDE */
+        .event-tag.completed { 
+            text-decoration: line-through; 
+            background-color: #ecfdf5 !important; 
+            color: #059669 !important; 
+            border-color: #d1fae5 !important; 
+            border-left-color: #10b981 !important; 
+            border-right-color: #10b981 !important;
+            box-shadow: none !important; 
+        }
+        .dark .event-tag.completed {
+            background-color: #064e3b !important; 
+            color: #34d399 !important; 
+            border-color: #065f46 !important;
+        }
+        .event-tag.completed .tag-visual-content { opacity: 0.5; }
+
+        /* Tarefas Canceladas */
+        .event-tag.cancelled {
+            background-color: #fee2e2 !important;
+            color: #ef4444 !important;
+            border-color: #fecaca !important;
+            border-left-color: #ef4444 !important;
+            border-right-color: #ef4444 !important;
+            text-decoration: line-through;
+            box-shadow: none !important;
+        }
+        .event-tag.cancelled .tag-visual-content { opacity: 0.5; }
+        .dark .event-tag.cancelled {
+            background-color: #450a0a !important;
+            color: #f87171 !important;
+            border-color: #7f1d1d !important;
+        }
+
+        .progress-container { width: 100%; height: 8px; background-color: #f1f5f9; border-radius: 10px; overflow: hidden; margin-top: 8px; }
+        .dark .progress-container { background-color: #334155; }
+        .progress-bar { height: 100%; background-color: #22c55e; transition: width 0.5s ease-in-out; }
+        
+        .filter-tag { cursor: pointer; transition: all 0.2s; border: 1px solid #e2e8f0; font-weight: 700; border-radius: 8px; padding: 6px 12px; font-size: 10px; text-transform: uppercase; }
+        .dark .filter-tag { border-color: #334155; color: #94a3b8; }
+        .filter-tag.active { 
+            background-color: #6366f1 !important; 
+            color: white !important; 
+            border-color: #4f46e5 !important; 
+            box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4); 
+        }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 5000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .modal.active { display: flex; }
+        
+        #userInfoModal.active { align-items: center; }
+
+        .overflow-y-auto::-webkit-scrollbar { width: 4px; }
+        .overflow-y-auto::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark .overflow-y-auto::-webkit-scrollbar-thumb { background: #475569; }
+        
+        .legend-scroll::-webkit-scrollbar { height: 4px; }
+        .legend-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .dark .legend-scroll::-webkit-scrollbar-thumb { background: #334155; }
+
+        .tab-btn { transition: all 0.2s; border-bottom: 2px solid transparent; padding: 8px 16px; font-weight: 700; font-size: 12px; text-transform: uppercase; color: #64748b; }
+        .tab-btn.active { border-bottom: 2px solid #6366f1; color: #6366f1; }
+        .dark .tab-btn.active { color: #818cf8; border-color: #818cf8; }
+        
+        .dashboard-card { border-radius: 24px; padding: 20px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); display: flex; flex-direction: column; justify-content: center; }
+        .dark .dashboard-card { border-color: #334155; background-color: #1e293b; }
+
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+        
+        .icon-option { cursor: pointer; padding: 12px; border-radius: 12px; border: 2px solid #f1f5f9; transition: all 0.2s; display: flex; align-items: center; justify-content: center; color: #64748b; }
+        .dark .icon-option { border-color: #334155; }
+        .icon-option:hover { background-color: #f1f5f9; border-color: #cbd5e1; }
+        .dark .icon-option:hover { background-color: #334155; }
+        .icon-option.selected { border-color: #6366f1; background-color: #eff6ff; color: #6366f1; transform: scale(1.1); }
+        .dark .icon-option.selected { background-color: #312e81; color: #818cf8; border-color: #818cf8; }
+
+        #loginOverlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+            z-index: 6000;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .login-card { background: white; padding: 2.5rem; border-radius: 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); width: 100%; max-width: 400px; }
+        .dark .login-card { background-color: #1e293b; }
+
+        #loadingSync {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: white; z-index: 4000;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .dark #loadingSync { background-color: #0f172a; }
+
+        #initialSplash {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #6366f1;
+            z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+            transition: opacity 0.5s ease;
+        }
+
+        .custom-tooltip {
+            position: absolute;
+            top: 110%;
+            margin-top: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            font-size: 8px;
+            font-weight: 900;
+            text-transform: uppercase;
+            padding: 4px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .event-tag .custom-tooltip {
+            top: auto;
+            bottom: 125%;
+            font-size: 7px;
+            background: #0f172a;
+            max-width: 200px;
+            white-space: normal;
+            text-align: center;
+            line-height: 1.4;
+            opacity: 0; 
+            pointer-events: none;
+        }
+
+        .event-tag:hover > .custom-tooltip { opacity: 1 !important; }
+        .group:hover > .custom-tooltip { opacity: 1; }
+
+        .remote-cursor {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            transition: all 0.2s ease-out;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .cursor-pointer-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+        .cursor-label {
+            margin-top: 4px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: white;
+            font-size: 8px;
+            font-weight: 900;
+            text-transform: uppercase;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
+
+<div id="remoteCursorsLayer"></div>
+
+<div id="initialSplash">
+    <div class="text-white text-center">
+        <div class="bg-white/20 p-6 rounded-full inline-block mb-4 animate-pulse">
+            <i class="fas fa-rocket fa-3x"></i>
+        </div>
+        <p class="font-black uppercase tracking-[0.3em] text-xs">Segurança Ativa</p>
+    </div>
+</div>
+
+<!-- TELA DE LOGIN -->
+<div id="loginOverlay">
+    <div class="login-card text-center">
+        <div class="inline-block bg-indigo-600 p-4 rounded-3xl text-white shadow-lg mb-6">
+            <i class="fas fa-rocket fa-2x"></i>
+        </div>
+        <h2 class="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-2">Bem-vindo</h2>
+        <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mb-8">Marketing Planner 2026</p>
+        <form id="loginForm" class="space-y-4 text-left">
+            <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1 text-left">E-mail</label>
+                <input type="email" id="loginEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium" placeholder="usuario@empresa.com">
+            </div>
+            <div class="relative">
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1 text-left">Senha</label>
+                <input type="password" id="loginPassword" required class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium" placeholder="••••••••">
+                <button type="button" onclick="window.togglePasswordVisibility()" class="absolute right-4 top-9 text-slate-400 hover:text-indigo-600">
+                    <i id="passwordIcon" class="fas fa-eye"></i>
+                </button>
+            </div>
+            <div id="loginError" class="hidden text-red-500 text-[11px] font-bold text-center bg-red-50 dark:bg-red-900/20 py-2 rounded-lg border border-red-100 dark:border-red-900/30 uppercase">Credenciais inválidas</div>
+            <button type="submit" id="btnLogin" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-black uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition transform active:scale-95">Entrar</button>
+            <p class="mt-4 text-[10px] text-slate-300 dark:text-slate-500 font-bold uppercase text-center tracking-widest">Versão 2.2</p>
+        </form>
+    </div>
+</div>
+
+<div id="loadingSync">
+    <div class="bg-indigo-600 p-4 rounded-3xl text-white animate-bounce mb-4"><i class="fas fa-sync fa-spin fa-2x"></i></div>
+    <p class="text-xs font-black uppercase tracking-widest text-slate-400">Sincronizando dados...</p>
+</div>
+
+<!-- APP CONTAINER -->
+<div id="appContainer" class="hidden min-h-screen flex flex-col" style="display: none;">
+    <header class="bg-white dark:bg-slate-900 border-b dark:border-slate-800 px-6 py-3 flex flex-row flex-wrap items-center justify-between gap-4 shadow-sm z-10 transition-colors">
+        <div class="flex items-center gap-3 shrink-0">
+            <div class="bg-indigo-600 p-2.5 rounded-xl text-white shadow-lg"><i class="fas fa-rocket text-sm"></i></div>
+            <div class="text-left">
+                <h1 class="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tighter leading-none">Marketing <span class="text-indigo-600">Planner</span></h1>
+                <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Gestão Estratégica 2026</p>
+            </div>
+        </div>
+
+        <div id="onlineUsersContainer" class="flex flex-row items-center gap-4 bg-slate-50 dark:bg-slate-800/50 px-4 py-2 rounded-2xl border border-slate-100 dark:border-slate-800 transition-all min-h-[50px]">
+            <div class="flex flex-row items-end gap-5" id="onlineUsersAvatars"></div>
+            <div class="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+            <span class="text-[9px] font-black uppercase text-slate-400 tracking-widest">Membros online</span>
+        </div>
+
+        <div class="flex flex-row items-center gap-2 sm:gap-4 ml-auto font-bold">
+            <div class="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shadow-inner transition-colors">
+                <button onclick="window.switchView('calendar')" id="btnViewCalendar" class="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition shadow-sm">Calendário</button>
+                <button onclick="window.switchView('dashboard')" id="btnViewDashboard" class="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition text-slate-500 hover:text-slate-700 dark:text-slate-400">Dashboard</button>
+            </div>
+
+            <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl transition-colors">
+                <button onclick="window.changeMonth(-1)" class="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition text-slate-500 dark:text-slate-400"><i class="fas fa-chevron-left text-[10px]"></i></button>
+                <span id="currentMonthYear" class="px-2 py-1 font-bold text-slate-700 dark:text-slate-200 min-w-[110px] text-center text-[10px] uppercase tracking-widest">Janeiro 2026</span>
+                <button onclick="window.changeMonth(1)" class="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition text-slate-500 dark:text-slate-400"><i class="fas fa-chevron-right text-[10px]"></i></button>
+            </div>
+
+            <div class="flex flex-row items-center gap-1.5">
+                <div class="relative group">
+                    <button onclick="window.toggleTheme()" class="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 p-2 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                        <i id="themeIcon" class="fas fa-moon text-xs"></i>
+                    </button>
+                    <div class="custom-tooltip">Alterar Tema</div>
+                </div>
+                <div class="relative group">
+                    <button onclick="window.openProfileModal()" class="bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 p-2 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition">
+                        <i id="userProfileIcon" class="fas fa-user-circle text-xs"></i>
+                    </button>
+                    <div class="custom-tooltip">Meu Perfil</div>
+                </div>
+                <div class="relative group">
+                    <button onclick="window.openConfigModal()" class="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 p-2 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                        <i class="fas fa-cog text-xs"></i>
+                    </button>
+                    <div class="custom-tooltip">Configurações</div>
+                </div>
+                <div class="relative group">
+                    <button onclick="window.openCampaignModal()" class="bg-slate-800 dark:bg-slate-700 text-white px-3 py-2 rounded-xl font-bold text-[9px] uppercase transition hover:bg-black">Estratégias</button>
+                    <div class="custom-tooltip">Estratégias</div>
+                </div>
+                <div class="relative group">
+                    <button onclick="window.openModal('')" class="bg-indigo-600 text-white px-3 py-2 rounded-xl font-bold text-[9px] uppercase transition hover:bg-indigo-700 shadow-md"><i class="fas fa-plus mr-1"></i> Novo Post</button>
+                    <div class="custom-tooltip">Agendar Post</div>
+                </div>
+                <div class="relative group">
+                    <button onclick="window.openLogoutConfirm()" class="bg-slate-100 dark:bg-slate-800 text-red-500 p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                        <i class="fas fa-sign-out-alt text-xs"></i>
+                    </button>
+                    <div class="custom-tooltip">Sair</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main id="calendarView" class="view-section active flex-1 p-4 overflow-auto text-left transition-colors dark:bg-slate-950/50">
+        <div class="max-w-[1600px] mx-auto overflow-x-auto no-scrollbar">
+            <div id="filterTagsContainer" class="mb-4 flex items-center gap-2 bg-white dark:bg-slate-900 border dark:border-slate-800 p-2 rounded-xl overflow-x-auto no-scrollbar shadow-sm transition-colors"></div>
+
+            <div class="mb-4 flex flex-wrap md:flex-nowrap gap-3 items-center bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm font-bold text-[10px] overflow-hidden transition-colors text-left">
+                <div class="flex gap-2 shrink-0">
+                    <select id="advFilterPlatform" onchange="window.updateUI()" class="px-2 py-1 border dark:border-slate-700 rounded bg-white dark:bg-slate-800 dark:text-slate-200 outline-none"><option value="all">Plataformas</option></select>
+                    <select id="advFilterFormat" onchange="window.updateUI()" class="px-2 py-1 border dark:border-slate-700 rounded bg-white dark:bg-slate-800 dark:text-slate-200 outline-none"><option value="all">Formatos</option></select>
+                    <select id="advFilterObjective" onchange="window.updateUI()" class="px-2 py-1 border dark:border-slate-700 rounded bg-white dark:bg-slate-800 dark:text-slate-200 outline-none"><option value="all">Objetivos</option></select>
+                    <button onclick="window.resetAdvancedFilters()" class="font-black text-indigo-500 uppercase px-2 transition hover:text-indigo-700">Limpar</button>
+                </div>
+                <div class="hidden md:block h-4 w-px bg-slate-200 dark:bg-slate-700 mx-2 shrink-0"></div>
+                <div id="dynamicLegend" class="flex flex-nowrap gap-x-4 items-center text-slate-500 dark:text-slate-400 uppercase font-bold overflow-x-auto legend-scroll flex-1 whitespace-nowrap min-w-0"></div>
+            </div>
+
+            <div id="campaignStatusRow" class="mb-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 hidden text-left font-bold"></div>
+
+            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden font-bold transition-colors">
+                <div class="calendar-header-row bg-slate-50 dark:bg-slate-800 border-b dark:border-slate-700 font-black text-[11px] text-slate-500 dark:text-slate-400 uppercase">
+                    <div class="calendar-setup">
+                        <div class="py-3 text-center">Dom</div>
+                        <div class="py-3 text-center text-indigo-600 dark:text-indigo-400">Seg</div>
+                        <div class="py-3 text-center text-indigo-600 dark:text-indigo-400">Ter</div>
+                        <div class="py-3 text-center text-indigo-600 dark:text-indigo-400">Qua</div>
+                        <div class="py-3 text-center text-indigo-600 dark:text-indigo-400">Qui</div>
+                        <div class="py-3 text-center text-indigo-600 dark:text-indigo-400">Sex</div>
+                        <div class="py-3 text-center">Sáb</div>
+                    </div>
+                </div>
+                <div id="calendarBody" class="calendar-grid calendar-setup"></div>
+            </div>
+        </div>
+    </main>
+
+    <main id="dashboardView" class="view-section flex-1 p-6 overflow-auto bg-slate-50/50 dark:bg-slate-950/50 text-left font-bold transition-colors">
+        <div class="max-w-[1600px] mx-auto font-bold text-left">
+            <div class="mb-8 flex flex-wrap items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm gap-4 text-left">
+                <div class="flex items-center gap-4">
+                    <div class="bg-indigo-50 dark:bg-indigo-900/30 p-2 rounded-xl text-indigo-600 dark:text-indigo-400 font-bold"><i class="fas fa-chart-line font-bold"></i></div>
+                    <div><h2 class="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">Análise Gerencial</h2><p id="currentUserDisplay" class="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Sincronizado</p></div>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 font-bold">
+                    <input type="date" id="dashStartDate" onchange="window.updateDashboard()" class="px-2 py-1 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-xs">
+                    <input type="date" id="dashEndDate" onchange="window.updateDashboard()" class="px-2 py-1 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-xs">
+                    <button onclick="window.resetDashPeriod()" class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase font-bold">Limpar</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 font-bold text-left">
+                <div class="dashboard-card border-l-8 border-indigo-500">
+                    <p class="text-[10px] text-slate-400 uppercase mb-1">Campanhas Ativas</p>
+                    <h3 id="statOngoingCampaigns" class="text-3xl font-black text-slate-800 dark:text-white">0</h3>
+                </div>
+                <div class="dashboard-card border-l-8 border-blue-500">
+                    <p class="text-[10px] text-slate-400 uppercase mb-1">Tarefas em Andamento</p>
+                    <h3 id="statOngoingTasks" class="text-3xl font-black text-slate-800 dark:text-white">0</h3>
+                </div>
+                <div class="dashboard-card border-l-8 border-emerald-500">
+                    <p class="text-[10px] text-slate-400 uppercase mb-1">Concluídas (Período)</p>
+                    <h3 id="statCompletedFiltered" class="text-3xl font-black text-slate-800 dark:text-white">0</h3>
+                    <p id="statCompletedRate" class="text-[10px] font-bold text-emerald-600 mt-1">0% do total</p>
+                </div>
+                <div class="dashboard-card border-l-8 border-amber-500">
+                    <p class="text-[10px] text-slate-400 uppercase mb-1">Concluídas com Atraso</p>
+                    <h3 id="statCompletedLate" class="text-3xl font-black text-slate-800 dark:text-white">0</h3>
+                    <p id="statCompletedLateRate" class="text-[10px] font-bold text-amber-600 mt-1">0% das concluídas</p>
+                </div>
+                <div class="dashboard-card border-l-8 border-red-500">
+                    <p class="text-[10px] text-slate-400 uppercase mb-1">Atrasadas no Momento</p>
+                    <h3 id="statOverdueNow" class="text-3xl font-black text-slate-800 dark:text-white">0</h3>
+                </div>
+                <div class="dashboard-card border-l-8 border-rose-600">
+                    <p class="text-[10px] text-slate-400 uppercase mb-1">Canceladas (Período)</p>
+                    <h3 id="statCancelledFiltered" class="text-3xl font-black text-slate-800 dark:text-white">0</h3>
+                </div>
+                <div class="dashboard-card border-l-8 border-cyan-500">
+                    <p class="text-[10px] text-slate-400 uppercase mb-1">Postagens no Prazo</p>
+                    <h3 id="statOnTimeRate" class="text-3xl font-black text-slate-800 dark:text-white">0%</h3>
+                    <p class="text-[10px] font-bold text-cyan-600 mt-1">Meta: 100%</p>
+                </div>
+                <div class="dashboard-card border-l-8 border-pink-500">
+                    <p class="text-[10px] text-slate-400 uppercase mb-1">Próxima Tarefa</p>
+                    <h3 id="statNextTask" class="text-sm font-black text-slate-800 dark:text-white truncate">Nenhuma</h3>
+                    <p id="statNextDate" class="text-[10px] font-bold text-slate-400 mt-1 uppercase">---</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="dashboard-card h-[400px] flex flex-col items-center">
+                    <h3 class="text-xs font-black text-slate-800 dark:text-white uppercase mb-6 tracking-widest text-left w-full">Distribuição de Status</h3>
+                    <div class="flex-1 w-full"><canvas id="chartStatus"></canvas></div>
+                </div>
+                <div class="dashboard-card h-[400px] flex flex-col items-center">
+                    <h3 class="text-xs font-black text-slate-800 dark:text-white uppercase mb-6 tracking-widest text-left w-full">Plataformas</h3>
+                    <div class="flex-1 w-full"><canvas id="chartPlatforms"></canvas></div>
+                </div>
+                <div class="dashboard-card h-[400px] flex flex-col items-center">
+                    <h3 class="text-xs font-black text-slate-800 dark:text-white uppercase mb-6 tracking-widest text-left w-full">Objetivos</h3>
+                    <div class="flex-1 w-full"><canvas id="chartObjectives"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div id="userProfileModal" class="modal font-bold text-left">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-xs p-6 shadow-2xl m-4 flex flex-col text-left transition-colors">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Meu Perfil</h2>
+            <button onclick="window.closeProfileModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="userProfileForm" onsubmit="window.saveUserProfile(event)" class="space-y-6">
+            <div class="grid grid-cols-1 gap-4">
+                <div class="space-y-1">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1 text-left">Apelido</label>
+                    <input type="text" id="userNickname" required class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm text-left" placeholder="Nome">
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1 text-left">Cor do Ícone</label>
+                    <input type="color" id="userAvatarColor" class="w-full h-10 border dark:border-slate-600 dark:bg-slate-800 p-1 rounded-xl cursor-pointer" value="#6366f1">
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-3 ml-1 text-left">Escolha seu Avatar</label>
+                <div id="avatarPickerGrid" class="grid grid-cols-4 gap-3 max-h-40 overflow-y-auto p-1"></div>
+            </div>
+            <button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-black uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition text-xs">Salvar Perfil</button>
+        </form>
+    </div>
+</div>
+
+<div id="userInfoModal" class="modal font-bold text-center">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-[280px] p-6 shadow-2xl m-4 flex flex-col text-center transition-colors relative">
+        <div id="userInfoAvatar" class="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl shadow-lg border-4 border-white dark:border-slate-800"></div>
+        <h3 id="userInfoNickname" class="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight mb-1 leading-tight text-center"></h3>
+        <p id="userInfoEmail" class="text-[10px] font-bold text-slate-400 dark:text-slate-500 lowercase tracking-wider mb-6 text-center"></p>
+        <button onclick="window.closeUserInfo()" class="w-full bg-slate-100 dark:bg-slate-800 py-3 rounded-xl font-black text-[10px] uppercase text-slate-500 dark:text-slate-400 hover:bg-slate-200 transition">Fechar</button>
+    </div>
+</div>
+
+<div id="configModal" class="modal font-bold text-left">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl p-6 shadow-2xl m-4 flex flex-col max-h-[90vh] transition-colors">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter font-bold">Configurações</h2>
+            <button onclick="window.closeConfigModal()" class="text-slate-400 hover:text-slate-600 transition font-bold"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="flex border-b dark:border-slate-800 mb-4">
+            <button onclick="window.switchConfigTab('platforms')" id="tab-platforms" class="tab-btn active">Plataformas</button>
+            <button onclick="window.switchConfigTab('formats')" id="tab-formats" class="tab-btn">Formatos</button>
+            <button onclick="window.switchConfigTab('objectives')" id="tab-objectives" class="tab-btn">Objetivos</button>
+        </div>
+        <div id="config-platforms" class="flex-1 overflow-y-auto pr-2">
+            <form id="platformForm" onsubmit="window.savePlatform(event)" class="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-2xl border dark:border-slate-700 mb-6 space-y-4">
+                <input type="hidden" id="editingPlatformId">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 font-bold">
+                    <input type="text" id="pltName" required class="w-full border dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2.5 rounded-xl text-sm font-bold text-left" placeholder="Nome">
+                    <input type="color" id="pltColor" class="w-full h-10 border dark:border-slate-600 dark:bg-slate-800 p-1 rounded-xl cursor-pointer" value="#6366f1">
+                </div>
+                <div id="iconPickerGrid" class="grid grid-cols-6 sm:grid-cols-8 gap-2 max-h-40 overflow-y-auto p-2 bg-white dark:bg-slate-800 rounded-xl border dark:border-slate-700"></div>
+                <div class="flex gap-2">
+                    <button type="button" id="btnCancelPlt" onclick="window.resetPlatformForm()" class="hidden flex-1 py-3 border dark:border-slate-600 rounded-xl font-bold text-xs uppercase text-slate-500">Cancelar</button>
+                    <button type="submit" id="btnSavePlt" class="flex-[2] bg-indigo-600 text-white py-3 rounded-xl font-bold text-xs uppercase shadow-md transition hover:bg-indigo-700">Salvar Plataforma</button>
+                </div>
+            </form>
+            <div id="platformList" class="grid grid-cols-1 gap-2"></div>
+        </div>
+        <div id="config-formats" class="hidden flex-1 overflow-y-auto pr-2 font-bold">
+            <form id="formatForm" onsubmit="window.saveFormat(event)" class="flex gap-2 mb-6 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border dark:border-slate-700 font-bold">
+                <input type="text" id="fmtName" required class="flex-1 border dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 rounded-xl text-sm font-bold text-left" placeholder="Ex: REELS">
+                <button type="submit" class="bg-indigo-600 text-white px-6 rounded-xl font-bold text-xs uppercase shadow-md transition hover:bg-indigo-700">Add</button>
+            </form>
+            <div id="formatList" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div id="config-objectives" class="hidden flex-1 overflow-y-auto pr-2 font-bold">
+            <form id="objectiveForm" onsubmit="window.saveObjective(event)" class="grid grid-cols-4 gap-2 mb-6 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border dark:border-slate-700">
+                <input type="text" id="objIcon" required class="col-span-1 border dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 rounded-xl text-sm text-center font-bold" placeholder="❤️">
+                <input type="text" id="objName" required class="col-span-2 border dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 rounded-xl text-sm font-bold text-left" placeholder="Nome">
+                <button type="submit" class="col-span-1 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase font-bold">Add</button>
+            </form>
+            <div id="objectiveList" class="space-y-2"></div>
+        </div>
+    </div>
+</div>
+
+<div id="campaignModal" class="modal font-bold text-left">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl m-4 flex flex-col max-h-[90vh] transition-colors">
+        <div class="flex justify-between items-center mb-4">
+            <h2 id="campaignModalTitle" class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter font-bold">Estratégias</h2>
+            <button onclick="window.closeCampaignModal()" class="text-slate-400 hover:text-slate-600 transition font-bold"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="campaignForm" onsubmit="window.saveCampaign(event)" class="space-y-3 border-b dark:border-slate-800 pb-6 mb-6">
+            <input type="hidden" id="editingCampaignId">
+            <input type="text" id="campName" required class="w-full border dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2.5 rounded-xl text-sm font-bold text-left" placeholder="Nome da Estratégia">
+            <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1">
+                    <label class="block text-[9px] uppercase text-slate-400 font-black ml-1 text-left">Cor do Tema</label>
+                    <input type="color" id="campColor" class="w-full h-10 border dark:border-slate-600 dark:bg-slate-800 p-1 rounded-xl cursor-pointer" value="#6366f1">
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-[9px] uppercase text-slate-400 font-black ml-1 text-left">Cor da Fonte</label>
+                    <input type="color" id="campFontColor" class="w-full h-10 border dark:border-slate-600 dark:bg-slate-800 p-1 rounded-xl cursor-pointer" value="#ffffff">
+                </div>
+            </div>
+            <textarea id="campObs" rows="2" class="w-full border dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 rounded-xl text-xs font-bold text-left" placeholder="Briefing..."></textarea>
+            <div class="flex gap-2">
+                <button type="button" onclick="window.resetCampaignForm()" class="flex-1 py-2 font-bold text-xs text-slate-500 uppercase transition">Limpar</button>
+                <button type="submit" id="submitCampBtn" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl font-bold text-xs uppercase shadow-md font-bold">Salvar</button>
+            </div>
+        </form>
+        <h3 class="text-[10px] font-black uppercase text-indigo-600 mb-2">Ativas</h3>
+        <div id="campaignList" class="space-y-2 mb-4 overflow-y-auto"></div>
+        <h3 class="text-[10px] font-black uppercase text-slate-400 mb-2">Concluídas</h3>
+        <div id="campaignCompletedList" class="space-y-2 opacity-60 overflow-y-auto text-left"></div>
+    </div>
+</div>
+
+<div id="eventModal" class="modal font-bold text-left">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-xs p-6 shadow-2xl m-4 overflow-y-auto max-h-[95vh] transition-colors">
+        <div class="flex justify-between items-center mb-4">
+            <h2 id="modalTitle" class="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tighter">Agendar Postagem</h2>
+            <button onclick="window.closeModal()" class="text-slate-400 hover:text-slate-600 transition font-bold"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="eventForm" onsubmit="window.saveAction(event)" class="space-y-3 font-bold">
+            <input type="hidden" id="editingId">
+            <select id="actionCampaignId" class="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold bg-slate-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 outline-none font-bold text-left"></select>
+            <div class="grid grid-cols-2 gap-3 font-bold">
+                <select id="actionObjective" class="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold bg-white dark:bg-slate-800 dark:text-white outline-none font-bold text-left"></select>
+                <select id="actionChannel" class="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold bg-white dark:bg-slate-800 dark:text-white outline-none font-bold text-left"></select>
+            </div>
+            <input type="text" id="actionTitle" required class="w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2.5 text-sm font-bold text-left" placeholder="Título...">
+            <div class="grid grid-cols-1 gap-3 font-bold">
+                <input type="date" id="actionDate" required class="w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2.5 text-sm font-bold">
+                <select id="actionFormat" class="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-bold bg-white dark:bg-slate-800 dark:text-white outline-none font-bold text-left"></select>
+            </div>
+            <input type="text" id="actionParticipants" class="w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2.5 text-sm font-bold text-left" placeholder="Participantes">
+            <textarea id="actionDescription" rows="2" class="w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm font-bold text-left" placeholder="Notas..."></textarea>
+            <div class="pt-2 flex gap-2 font-bold text-center">
+                <button type="button" onclick="window.closeModal()" class="flex-1 py-3 font-bold text-xs text-slate-500 uppercase transition hover:bg-slate-50 dark:hover:bg-slate-800 font-bold">Cancelar</button>
+                <button type="submit" class="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold text-xs shadow-lg transition hover:bg-indigo-700 uppercase font-bold text-center">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="detailsModal" class="modal font-bold text-left">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl m-4 transition-colors">
+        <div class="flex justify-between items-start mb-4">
+            <div id="detailsIcon" class="p-3 rounded-2xl text-white shadow-md font-bold"></div>
+            <div class="flex gap-2 font-bold">
+                <button onclick="window.openEditCurrentAction()" class="text-slate-300 dark:text-slate-600 hover:text-indigo-600 transition p-1 font-bold"><i class="fas fa-pen font-bold"></i></button>
+                <button onclick="window.deleteCurrentTask()" class="text-slate-300 dark:text-slate-600 hover:text-red-500 transition p-1 font-bold"><i class="fas fa-trash font-bold"></i></button>
+                <button onclick="window.closeDetails()" class="text-slate-400 dark:text-slate-500 hover:text-slate-600 transition p-1 font-bold"><i class="fas fa-times fa-lg"></i></button>
+            </div>
+        </div>
+        <div class="space-y-4 font-bold">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex flex-wrap gap-2">
+                    <span id="detailsCampaignBadge" class="px-2 py-0.5 rounded text-[9px] font-black uppercase font-bold text-left"></span>
+                    <span id="detailsPlatformBadge" class="px-2 py-0.5 rounded text-[9px] font-black uppercase text-white font-bold text-left"></span>
+                    <span id="detailsObjectiveBadge" class="px-2 py-0.5 rounded text-[9px] font-black uppercase text-white font-bold text-left"></span>
+                    <span id="detailsFormatBadge" class="px-2 py-0.5 rounded text-[9px] font-black uppercase text-white font-bold text-left"></span>
+                </div>
+                <div id="detailsStatusBadge" class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider font-bold"></div>
+            </div>
+            <h2 id="detailsTitle" class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter leading-tight font-bold text-left"></h2>
+            <p id="detailsDate" class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mt-1 font-bold text-left"></p>
+            <div id="detailsParticipantsContainer" class="hidden font-bold">
+                <h3 class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase mb-1 font-bold text-left">Participantes:</h3>
+                <div class="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 font-bold"><i class="fas fa-users text-slate-300 dark:text-slate-700 font-bold"></i><span id="detailsParticipants" class="text-left"></span></div>
+            </div>
+            <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 italic font-medium font-bold"><p id="detailsDescription" class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-bold text-left"></p></div>
+            
+            <div class="flex flex-col gap-2">
+                <button id="detailsCompleteBtn" class="w-full py-3 rounded-xl font-black text-xs uppercase shadow-md transition transform active:scale-95 flex items-center justify-center gap-2 font-bold"><i class="fas fa-check-circle text-center"></i><span id="detailsBtnLabel" class="text-center">Concluir Tarefa</span></button>
+                <!-- BOTÃO DUPLICAR ADICIONADO -->
+                <button id="detailsDuplicateBtn" onclick="window.duplicateCurrentTask()" class="w-full py-3 rounded-xl font-black text-xs uppercase shadow-md transition transform active:scale-95 flex items-center justify-center gap-2 font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"><i class="fas fa-copy text-center"></i><span class="text-center">Duplicar Tarefa</span></button>
+                <button id="detailsCancelBtn" class="w-full py-3 rounded-xl font-black text-xs uppercase shadow-md transition transform active:scale-95 flex items-center justify-center gap-2 font-bold bg-rose-100 dark:bg-rose-900/30 text-rose-600"><i class="fas fa-ban text-center"></i><span id="detailsCancelBtnLabel" class="text-center">Cancelar Tarefa</span></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="deleteConfirmModal" class="modal font-bold text-center">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-xs p-6 shadow-2xl m-4 transition-colors text-center">
+        <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase mb-2 font-bold text-center">Excluir?</h3>
+        <div class="flex gap-2 mt-6 font-bold text-center"><button onclick="window.closeDeleteConfirm()" class="flex-1 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold text-xs uppercase transition hover:bg-slate-200 dark:hover:bg-slate-700 font-bold dark:text-white text-center">Não</button><button id="btnConfirmDelete" class="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase transition hover:bg-red-700 font-bold text-center">Sim</button></div>
+    </div>
+</div>
+
+<div id="logoutConfirmModal" class="modal font-bold text-center">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-xs p-6 shadow-2xl m-4 transition-colors text-center">
+        <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase mb-2 font-bold text-center">Que pena!</h3>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-6 font-bold text-center">Tem certeza que deseja sair do sistema?</p>
+        <div class="flex gap-2 mt-6 font-bold text-center">
+            <button onclick="window.closeLogoutConfirm()" class="flex-1 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold text-xs uppercase transition hover:bg-slate-200 dark:hover:bg-slate-700 font-bold dark:text-white text-center">Não</button>
+            <button onclick="window.logout()" class="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase transition hover:bg-red-700 font-bold text-center">Sim</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    const MY_FIREBASE_CONFIG = {
+        apiKey: "AIzaSyDzJdZMunqBPejaIbGq7YeMGQ56zQef-kQ",
+        authDomain: "marketingplannervx2026.firebaseapp.com",
+        projectId: "marketingplannervx2026",
+        storageBucket: "marketingplannervx2026.firebasestorage.app",
+        messagingSenderId: "980090116760",
+        appId: "1:980090116760:web:2afb4a79f412848fca0eed",
+        measurementId: "G-DKQNKZTSP4"
+    };
+
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, query, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+    const app = initializeApp(MY_FIREBASE_CONFIG);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appIdPrefix = 'marketingplannervx2026';
+
+    setPersistence(auth, browserSessionPersistence);
+
+    const getPubColl = (name) => collection(db, 'artifacts', appIdPrefix, 'public', 'data', name);
+    const getPubDoc = (name, id) => doc(db, 'artifacts', appIdPrefix, 'public', 'data', name, id);
+
+    window.marketingActions = [];
+    window.campaigns = [];
+    window.platforms = [];
+    window.formats = [];
+    window.objectives = [];
+    window.userProfiles = []; 
+    window.myProfile = null;
+    window.currentAction = null;
+    
+    window.currentDate = new Date(2026, 0, 1);
+    window.activeFilters = ['all'];
+    window.currentView = 'calendar';
+    window.selectedPlatformIcon = 'fab fa-instagram';
+    window.selectedAvatarIcon = 'fas fa-user';
+    window.idToDelete = null;
+    window.deleteType = null;
+    window.chartPltInstance = null;
+    window.chartObjInstance = null;
+    window.chartStatusInstance = null;
+    window.heartbeatInterval = null;
+    
+    let unsubActions, unsubCampaigns, unsubPlatforms, unsubFormats, unsubObjectives, unsubProfiles;
+    let lastOnlineUserListState = ""; 
+    let lastMouseMove = 0;
+    const MOUSE_THROTTLE = 200; 
+
+    const iconLibrary = [
+        'fab fa-instagram', 'fab fa-tiktok', 'fab fa-whatsapp', 'fab fa-youtube', 'fab fa-facebook-f',
+        'fab fa-twitter', 'fab fa-linkedin-in', 'fab fa-telegram-plane', 'fab fa-pinterest-p',
+        'fas fa-store', 'fas fa-shopping-cart', 'fas fa-ad', 'fas fa-rocket', 'fas fa-video',
+        'fas fa-image', 'fas fa-link', 'fas fa-envelope', 'fas fa-phone', 'fas fa-bullhorn',
+        'fas fa-users', 'fas fa-calendar-star', 'fas fa-camera', 'fas fa-podcast', 'fas fa-globe',
+        'fas fa-envelope-open-text', 'fas fa-map-marker-alt', 'fas fa-utensils', 'fas fa-dumbbell',
+        'fas fa-laptop-code', 'fas fa-palette', 'fas fa-music', 'fas fa-chart-line', 'fas fa-bolt',
+        'fas fa-tag', 'fas fa-star', 'fas fa-gift'
+    ];
+
+    const avatarLibrary = [
+        'fas fa-user', 'fas fa-user-tie', 'fas fa-user-ninja', 'fas fa-user-astronaut',
+        'fas fa-user-secret', 'fas fa-cat', 'fas fa-dog', 'fas fa-dragon',
+        'fas fa-hippo', 'fas fa-horse', 'fas fa-otter', 'fas fa-frog'
+    ];
+
+    window.renderConfigLists = () => {
+        const pltList = document.getElementById('platformList');
+        if (pltList) { pltList.innerHTML = window.platforms.map(p => `<div class="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-sm mb-2 font-bold"><div class="flex items-center gap-3 text-left"><div class="w-8 h-8 rounded-lg flex items-center justify-center text-white" style="background-color: ${p.color}"><i class="${p.icon}"></i></div><span class="text-xs uppercase dark:text-slate-200 text-left">${p.name}</span></div><div class="flex gap-1"><button onclick="window.editPlatform('${p.id}')" class="p-2 text-indigo-600 hover:bg-slate-50 rounded-lg transition"><i class="fas fa-pen text-[10px]"></i></button><button onclick="window.prepareDelete('${p.id}', 'plt')" class="p-2 text-red-500 hover:bg-slate-50 rounded-lg transition"><i class="fas fa-trash text-[10px]"></i></button></div></div>`).join(''); }
+        const fmtList = document.getElementById('formatList');
+        if (fmtList) { fmtList.innerHTML = window.formats.map(f => `<div class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl border dark:border-slate-700 font-bold"><span class="text-[10px] font-black uppercase dark:text-slate-300 text-left">${f.name}</span><button onclick="window.prepareDelete('${f.id}', 'fmt')" class="text-slate-400 hover:text-red-500 ml-1"><i class="fas fa-times text-[9px]"></i></button></div>`).join(''); }
+        const objList = document.getElementById('objectiveList');
+        if (objList) { objList.innerHTML = window.objectives.map(o => `<div class="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-sm font-bold mb-2 transition-colors text-left"><div class="flex items-center gap-3 text-left"><span>${o.icon}</span><span class="text-xs uppercase font-bold dark:text-slate-200 text-left">${o.name}</span></div><button onclick="window.prepareDelete('${o.id}', 'obj')" class="text-slate-300 hover:text-red-500 p-2"><i class="fas fa-trash text-[10px]"></i></button></div>`).join(''); }
+    };
+
+    window.renderAdvancedFilterOptions = () => {
+        const pSel = document.getElementById('advFilterPlatform'), fSel = document.getElementById('advFilterFormat'), oSel = document.getElementById('advFilterObjective'); 
+        if(!pSel) return;
+        const curP = pSel.value, curF = fSel.value, curO = oSel.value;
+        pSel.innerHTML = '<option value="all">Plataformas</option>' + window.platforms.map(p => `<option value="${p.id}">${p.name}</option>`).join(''); fSel.innerHTML = '<option value="all">Formatos</option>' + window.formats.map(f => `<option value="${f.name}">${f.name}</option>`).join(''); oSel.innerHTML = '<option value="all">Objetivos</option>' + window.objectives.map(o => `<option value="${o.id}">${o.icon} ${o.name}</option>`).join('');
+        pSel.value = curP; fSel.value = curF; oSel.value = curO;
+    };
+
+    window.renderCampaignSelectors = () => {
+        const aC = document.getElementById('actionCampaignId'), aP = document.getElementById('actionChannel'), aF = document.getElementById('actionFormat'), aO = document.getElementById('actionObjective');
+        if(aC) { aC.innerHTML = `<option value="">Ação Isolada</option>` + window.campaigns.map(c => `<option value="${c.id}">${c.name}</option>`).join(''); aP.innerHTML = window.platforms.map(p => `<option value="${p.id}">${p.name}</option>`).join(''); aF.innerHTML = window.formats.map(f => `<option value="${f.name}">${f.name}</option>`).join(''); aO.innerHTML = window.objectives.map(o => `<option value="${o.id}">${o.icon} ${o.name}</option>`).join(''); }
+        
+        const actL = document.getElementById('campaignList'), cmpL = document.getElementById('campaignCompletedList');
+        if(!actL || !cmpL) return;
+        
+        const active = [], done = []; 
+        window.campaigns.forEach(c => { 
+            const tasks = window.marketingActions.filter(a => String(a.campaignId) === String(c.id)); 
+            if (tasks.length > 0 && tasks.every(t => t.status === 'concluido')) done.push(c); 
+            else active.push(c); 
+        });
+
+        const cToH = (c, isD) => `
+            <div class="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 mb-2 font-bold text-left">
+                <div class="flex items-center gap-3 text-left overflow-hidden">
+                    <div class="w-3 h-3 rounded-full shrink-0" style="background-color: ${c.color}"></div>
+                    <p class="text-xs font-black truncate uppercase text-slate-800 dark:text-slate-200 text-left ${isD ? 'line-through opacity-50' : ''}">${c.name}</p>
+                </div>
+                <div class="flex gap-1 shrink-0">
+                    <button onclick="window.editCampaign('${c.id}')" class="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition"><i class="fas fa-pen text-[10px]"></i></button>
+                    <button onclick="window.prepareDelete('${c.id}', 'camp')" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"><i class="fas fa-trash text-[10px]"></i></button>
+                </div>
+            </div>`;
+
+        actL.innerHTML = active.map(c => cToH(c, false)).join('') || '<p class="text-[9px] text-slate-300 italic text-center p-4">Nenhuma estratégia em andamento.</p>'; 
+        cmpL.innerHTML = done.map(c => cToH(c, true)).join('') || '<p class="text-[9px] text-slate-300 italic text-center p-4">Nenhuma estratégia concluída.</p>';
+    };
+
+    window.handleDragStart = (e, taskId) => {
+        e.dataTransfer.setData("taskId", taskId);
+        e.target.classList.add('dragging');
+        e.dataTransfer.effectAllowed = "move";
+    };
+
+    window.handleDragEnd = (e) => { e.target.classList.remove('dragging'); };
+
+    window.handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const day = e.currentTarget;
+        if (!day.classList.contains('drag-over')) { day.classList.add('drag-over'); }
+    };
+
+    window.handleDragLeave = (e) => { e.currentTarget.classList.remove('drag-over'); };
+
+    window.handleDrop = async (e, targetDate) => {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+        const taskId = e.dataTransfer.getData("taskId");
+        if (!taskId || !auth.currentUser) return;
+        try {
+            const taskRef = getPubDoc('marketingActions', taskId);
+            await updateDoc(taskRef, { date: targetDate });
+        } catch (err) { console.error("Erro ao mover tarefa:", err); }
+    };
+
+    window.openUserInfo = (userId) => {
+        const user = window.userProfiles.find(u => u.id === userId);
+        if(!user) return;
+        const modal = document.getElementById('userInfoModal');
+        const avatar = document.getElementById('userInfoAvatar');
+        const nickname = document.getElementById('userInfoNickname');
+        const email = document.getElementById('userInfoEmail');
+        avatar.style.backgroundColor = user.avatarColor || '#6366f1';
+        avatar.innerHTML = `<i class="${user.avatar}"></i>`;
+        nickname.innerText = user.nickname;
+        email.innerText = user.email || 'E-mail não sincronizado';
+        modal.classList.add('active');
+    };
+    
+    window.closeUserInfo = () => document.getElementById('userInfoModal').classList.remove('active');
+
+    window.toggleTheme = () => {
+        const isDark = document.body.classList.toggle('dark');
+        localStorage.setItem('plannerTheme', isDark ? 'dark' : 'light');
+        window.updateThemeUI();
+        window.switchView(window.currentView); 
+        window.updateUI(); 
+    };
+
+    window.updateThemeUI = () => {
+        const isDark = document.body.classList.contains('dark');
+        const icon = document.getElementById('themeIcon');
+        if (icon) { icon.className = isDark ? 'fas fa-sun text-xs' : 'fas fa-moon text-xs'; }
+    };
+
+    if (localStorage.getItem('plannerTheme') === 'dark') { document.body.classList.add('dark'); }
+    window.updateThemeUI();
+
+    window.handleLogin = async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const pass = document.getElementById('loginPassword').value;
+        const btn = document.getElementById('btnLogin');
+        btn.innerText = "Entrando...";
+        try { await signInWithEmailAndPassword(auth, email, pass); } 
+        catch (err) { 
+            btn.innerText = "Entrar"; 
+            document.getElementById('loginError').classList.remove('hidden'); 
+        }
+    };
+    document.getElementById('loginForm').onsubmit = window.handleLogin;
+
+    window.openLogoutConfirm = () => document.getElementById('logoutConfirmModal').classList.add('active');
+    window.closeLogoutConfirm = () => document.getElementById('logoutConfirmModal').classList.remove('active');
+
+    window.logout = async () => {
+        if (window.heartbeatInterval) clearInterval(window.heartbeatInterval);
+        if(unsubActions) unsubActions();
+        if(unsubCampaigns) unsubCampaigns();
+        if(unsubPlatforms) unsubPlatforms();
+        if(unsubFormats) unsubFormats();
+        if(unsubObjectives) unsubObjectives();
+        if(unsubProfiles) unsubProfiles();
+        window.closeLogoutConfirm();
+        await signOut(auth);
+        
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) loginForm.reset();
+        const btnLogin = document.getElementById('btnLogin');
+        if (btnLogin) btnLogin.innerText = "Entrar";
+        const loginError = document.getElementById('loginError');
+        if (loginError) loginError.classList.add('hidden');
+    };
+
+    window.togglePasswordVisibility = () => {
+        const pass = document.getElementById('loginPassword');
+        const icon = document.getElementById('passwordIcon');
+        if (pass.type === "password") { pass.type = "text"; icon.classList.replace('fa-eye', 'fa-eye-slash'); } 
+        else { pass.type = "password"; icon.classList.replace('fa-eye-slash', 'fa-eye'); }
+    };
+
+    const startSync = async () => {
+        const errH = (err) => { if (err.code !== 'permission-denied') console.error("Firestore Error:", err); };
+        
+        if (auth.currentUser) {
+            const profileRef = getPubDoc('profiles', auth.currentUser.uid);
+            const pSnap = await getDoc(profileRef).catch(() => null);
+            if (pSnap && pSnap.exists()) {
+                const data = pSnap.data();
+                window.myProfile = data;
+                window.selectedAvatarIcon = data.avatar;
+            }
+        }
+
+        unsubActions = onSnapshot(getPubColl('marketingActions'), s => { 
+            window.marketingActions = s.docs.map(d => ({ id: d.id, ...d.data() })); 
+            window.updateUI(); 
+            if(document.getElementById('loadingSync')) document.getElementById('loadingSync').style.display = 'none'; 
+        }, errH);
+        unsubCampaigns = onSnapshot(getPubColl('campaigns'), s => { window.campaigns = s.docs.map(d => ({ id: d.id, ...d.data() })); window.updateUI(); }, errH);
+        unsubPlatforms = onSnapshot(getPubColl('platforms'), s => { window.platforms = s.docs.map(d => ({ id: d.id, ...d.data() })); window.renderAdvancedFilterOptions(); window.renderConfigLists(); window.updateUI(); }, errH);
+        unsubFormats = onSnapshot(getPubColl('formats'), s => { window.formats = s.docs.map(d => ({ id: d.id, ...d.data() })); window.renderAdvancedFilterOptions(); window.renderConfigLists(); window.updateUI(); }, errH);
+        unsubObjectives = onSnapshot(getPubColl('objectives'), s => { window.objectives = s.docs.map(d => ({ id: d.id, ...d.data() })); window.renderAdvancedFilterOptions(); window.renderConfigLists(); window.updateUI(); }, errH);
+        unsubProfiles = onSnapshot(getPubColl('profiles'), s => { window.userProfiles = s.docs.map(d => ({ id: d.id, ...d.data() })); window.renderOnlineUsers(); window.renderRemoteCursors(); }, errH);
+        
+        window.startHeartbeat();
+        window.initCollaborationEvents();
+    };
+
+    window.startHeartbeat = () => {
+        if (window.heartbeatInterval) clearInterval(window.heartbeatInterval);
+        const update = async () => {
+            if (auth.currentUser) {
+                const profileRef = getPubDoc('profiles', auth.currentUser.uid);
+                const profilePayload = {
+                    nickname: window.myProfile?.nickname || auth.currentUser.email.split('@')[0], 
+                    avatar: window.myProfile?.avatar || 'fas fa-user',
+                    avatarColor: window.myProfile?.avatarColor || '#6366f1',
+                    email: auth.currentUser.email,
+                    lastActive: Date.now()
+                };
+                await setDoc(profileRef, profilePayload, { merge: true }).catch(() => {});
+            }
+        };
+        update();
+        window.heartbeatInterval = setInterval(update, 30000); 
+    };
+
+    window.initCollaborationEvents = () => {
+        document.addEventListener('mousemove', (e) => {
+            const now = Date.now();
+            if (now - lastMouseMove > MOUSE_THROTTLE && auth.currentUser) {
+                lastMouseMove = now;
+                const profileRef = getPubDoc('profiles', auth.currentUser.uid);
+                updateDoc(profileRef, { mx: (e.clientX / window.innerWidth) * 100, my: (e.clientY / window.innerHeight) * 100 }).catch(() => {});
+            }
+        });
+        document.addEventListener('mousedown', (e) => {
+            if (auth.currentUser) {
+                const profileRef = getPubDoc('profiles', auth.currentUser.uid);
+                updateDoc(profileRef, { cx: (e.clientX / window.innerWidth) * 100, cy: (e.clientY / window.innerHeight) * 100, ct: Date.now() }).catch(() => {});
+            }
+        });
+    };
+
+    window.renderRemoteCursors = () => {
+        const layer = document.getElementById('remoteCursorsLayer');
+        if (!layer) return;
+        const now = Date.now();
+        const activeRemoteUsers = window.userProfiles.filter(u => u.id !== auth.currentUser?.uid && u.lastActive > (now - 60000));
+        const currentCursorIds = activeRemoteUsers.map(u => `cursor-${u.id}`);
+        Array.from(layer.children).forEach(child => { if (!currentCursorIds.includes(child.id)) child.remove(); });
+        activeRemoteUsers.forEach(u => {
+            let cursor = document.getElementById(`cursor-${u.id}`);
+            const color = u.avatarColor || '#6366f1';
+            if (!cursor) {
+                cursor = document.createElement('div');
+                cursor.id = `cursor-${u.id}`;
+                cursor.className = 'remote-cursor';
+                cursor.innerHTML = `<div class="cursor-pointer-icon" style="background-color: ${color}"></div><div class="cursor-label" style="background-color: ${color}"><i class="${u.avatar}"></i> ${u.nickname}</div>`;
+                layer.appendChild(cursor);
+            } else {
+                cursor.querySelector('.cursor-pointer-icon').style.backgroundColor = color;
+                cursor.querySelector('.cursor-label').style.backgroundColor = color;
+                cursor.querySelector('.cursor-label').innerHTML = `<i class="${u.avatar}"></i> ${u.nickname}`;
+            }
+            if (u.mx !== undefined && u.my !== undefined) { cursor.style.left = `${u.mx}vw`; cursor.style.top = `${u.my}vh`; }
+        });
+    };
+
+    window.renderOnlineUsers = () => {
+        const container = document.getElementById('onlineUsersAvatars'); if (!container) return;
+        const now = Date.now();
+        const activeUsers = window.userProfiles.filter(u => u.lastActive > (now - 120000));
+        const currentState = activeUsers.map(u => u.id + u.nickname + u.avatar + u.avatarColor).join('|');
+        if (currentState === lastOnlineUserListState) return;
+        lastOnlineUserListState = currentState;
+        container.innerHTML = activeUsers.map(u => `
+            <div class="flex flex-col items-center group relative cursor-pointer online-user-item" onclick="window.openUserInfo('${u.id}')" style="z-index: 50;">
+                <div class="w-10 h-10 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-white shadow-sm user-online-badge relative pointer-events-none" style="background-color: ${u.avatarColor || '#6366f1'};">
+                    <i class="${u.avatar} text-[12px]"></i>
+                    <span class="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+                    <div class="absolute top-12 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 font-black uppercase shadow-lg">
+                        ${u.nickname} ${u.id === auth.currentUser?.uid ? '(Você)' : ''}
+                    </div>
+                </div>
+                <span class="text-[8px] font-black uppercase text-slate-500 dark:text-slate-400 mt-1 leading-none truncate max-w-[60px] text-center pointer-events-none">${u.nickname}</span>
+            </div>`).join('');
+        document.getElementById('onlineUsersContainer').classList.toggle('hidden', activeUsers.length === 0);
+    };
+
+    window.openProfileModal = async () => {
+        if (auth.currentUser) {
+            const docSnap = await getDoc(getPubDoc('profiles', auth.currentUser.uid)).catch(() => null);
+            if (docSnap?.exists()) {
+                const p = docSnap.data();
+                document.getElementById('userNickname').value = p.nickname;
+                document.getElementById('userAvatarColor').value = p.avatarColor || '#6366f1';
+                window.selectedAvatarIcon = p.avatar;
+            }
+            window.renderAvatarPicker();
+            document.getElementById('userProfileModal').classList.add('active');
+        }
+    };
+    window.closeProfileModal = () => document.getElementById('userProfileModal').classList.remove('active');
+    window.renderAvatarPicker = () => {
+        const grid = document.getElementById('avatarPickerGrid');
+        grid.innerHTML = avatarLibrary.map(icon => `<div class="icon-option ${window.selectedAvatarIcon === icon ? 'selected' : ''}" onclick="window.selectAvatar('${icon}')"><i class="${icon} fa-lg"></i></div>`).join('');
+    };
+    window.selectAvatar = (icon) => { window.selectedAvatarIcon = icon; window.renderAvatarPicker(); };
+    window.saveUserProfile = async (e) => {
+        e.preventDefault(); if (auth.currentUser) {
+            const nickname = document.getElementById('userNickname').value;
+            const color = document.getElementById('userAvatarColor').value;
+            window.myProfile = { nickname, avatar: window.selectedAvatarIcon, avatarColor: color };
+            await setDoc(getPubDoc('profiles', auth.currentUser.uid), { nickname, avatar: window.selectedAvatarIcon, avatarColor: color, email: auth.currentUser.email, lastActive: Date.now() }, { merge: true }).catch(() => {});
+            window.closeProfileModal();
+        }
+    };
+
+    // --- CRUD ---
+    window.saveCampaign = async (e) => {
+        e.preventDefault(); if(!auth.currentUser) return;
+        const id = document.getElementById('editingCampaignId').value;
+        const data = { name: document.getElementById('campName').value, color: document.getElementById('campColor').value, fontColor: document.getElementById('campFontColor').value, obs: document.getElementById('campObs').value };
+        if (id) await updateDoc(getPubDoc('campaigns', id), data).catch(() => {});
+        else await addDoc(getPubColl('campaigns'), data);
+        window.resetCampaignForm(); 
+    };
+
+    window.saveAction = async (e) => {
+        e.preventDefault(); if(!auth.currentUser) return;
+        const id = document.getElementById('editingId').value;
+        const data = { title: document.getElementById('actionTitle').value, date: document.getElementById('actionDate').value, channel: document.getElementById('actionChannel').value, format: document.getElementById('actionFormat').value, description: document.getElementById('actionDescription').value, campaignId: document.getElementById('actionCampaignId').value, participants: document.getElementById('actionParticipants').value, objective: document.getElementById('actionObjective').value };
+        if (id) await updateDoc(getPubDoc('marketingActions', id), data).catch(() => {});
+        else await addDoc(getPubColl('marketingActions'), { ...data, status: 'planejado', completionDate: null }).catch(() => {});
+        window.closeModal();
+    };
+
+    window.savePlatform = async (e) => {
+        e.preventDefault(); if(!auth.currentUser) return;
+        const id = document.getElementById('editingPlatformId').value;
+        const data = { name: document.getElementById('pltName').value, color: document.getElementById('pltColor').value, icon: window.selectedPlatformIcon };
+        if (id) await updateDoc(getPubDoc('platforms', id), data).catch(() => {});
+        else await addDoc(getPubColl('platforms'), data).catch(() => {});
+        window.resetPlatformForm();
+    };
+
+    window.saveFormat = async (e) => {
+        e.preventDefault(); if(!auth.currentUser) return;
+        await addDoc(getPubColl('formats'), { name: document.getElementById('fmtName').value.toUpperCase() }).catch(() => {});
+        document.getElementById('formatForm').reset(); 
+    };
+
+    window.saveObjective = async (e) => {
+        e.preventDefault(); if(!auth.currentUser) return;
+        await addDoc(getPubColl('objectives'), { icon: document.getElementById('objIcon').value, name: document.getElementById('objName').value }).catch(() => {});
+        document.getElementById('objectiveForm').reset(); 
+    };
+
+    window.switchView = (v) => {
+        window.currentView = v;
+        document.getElementById('calendarView').classList.toggle('active', v === 'calendar');
+        document.getElementById('dashboardView').classList.toggle('active', v === 'dashboard');
+        const cB = document.getElementById('btnViewCalendar');
+        const dB = document.getElementById('btnViewDashboard');
+        const isD = document.body.classList.contains('dark');
+        
+        if (v === 'calendar') {
+            cB.className = `px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition active ${isD ? 'bg-slate-700 text-indigo-400' : 'bg-white text-indigo-600'} shadow-sm`;
+            dB.className = 'px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition text-slate-500 hover:text-slate-700 dark:text-slate-400';
+        } else {
+            dB.className = `px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition active ${isD ? 'bg-slate-700 text-indigo-400' : 'bg-white text-indigo-600'} shadow-sm`;
+            cB.className = 'px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition text-slate-500 hover:text-slate-700 dark:text-slate-400';
+            window.updateDashboard();
+        }
+    };
+
+    window.changeMonth = (d) => { window.currentDate.setMonth(window.currentDate.getMonth() + d); window.updateUI(); };
+    window.updateUI = () => { 
+        window.renderFilterTags(); 
+        window.renderCampaignSelectors(); 
+        window.renderLegend(); 
+        window.renderCalendar(); 
+        if (window.currentView === 'dashboard') window.updateDashboard(); 
+    };
+
+    window.renderFilterTags = () => {
+        const container = document.getElementById('filterTagsContainer'); if(!container) return;
+        let html = `<span onclick="window.toggleFilter('all')" class="filter-tag px-3 py-1.5 rounded-lg text-[9px] font-black uppercase whitespace-nowrap ${window.activeFilters.includes('all') ? 'active' : 'bg-white dark:bg-slate-800 text-slate-500'}">Todas</span>`;
+        window.campaigns.forEach(c => {
+            const isActive = window.activeFilters.includes(c.id.toString());
+            html += `<span onclick="window.toggleFilter('${c.id}')" class="filter-tag px-3 py-1.5 rounded-lg text-[9px] font-black uppercase whitespace-nowrap ${isActive ? 'active' : 'bg-white dark:bg-slate-800 text-slate-500'}">${c.name}</span>`;
+        });
+        container.innerHTML = html;
+    };
+
+    window.toggleFilter = (id) => {
+        if (id === 'all') window.activeFilters = ['all'];
+        else {
+            window.activeFilters = window.activeFilters.filter(f => f !== 'all');
+            if (window.activeFilters.includes(id)) { window.activeFilters = window.activeFilters.filter(f => f !== id); if (window.activeFilters.length === 0) window.activeFilters = ['all']; }
+            else window.activeFilters.push(id);
+        }
+        window.updateUI();
+    };
+
+    window.renderCalendar = () => {
+        const year = window.currentDate.getFullYear(); const month = window.currentDate.getMonth();
+        const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+        document.getElementById('currentMonthYear').textContent = `${monthNames[month]} ${year}`;
+        const calendarBody = document.getElementById('calendarBody'); if (!calendarBody) return;
+        calendarBody.innerHTML = '';
+        const firstDay = new Date(year, month, 1).getDay(); const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const isD = document.body.classList.contains('dark');
+        for (let i = 0; i < firstDay; i++) calendarBody.appendChild(Object.assign(document.createElement('div'), {className: `calendar-day ${isD ? 'bg-slate-900/30' : 'bg-slate-50/30'}`}));
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dayEl = document.createElement('div'); 
+            dayEl.className = `calendar-day group flex flex-col font-bold ${isD ? 'bg-slate-900' : 'bg-white'}`;
+            dayEl.setAttribute("ondragover", "window.handleDragOver(event)");
+            dayEl.setAttribute("ondragleave", "window.handleDragLeave(event)");
+            dayEl.setAttribute("ondrop", `window.handleDrop(event, '${dateStr}')`);
+            const isToday = new Date().toLocaleDateString('sv-SE') === dateStr;
+            dayEl.innerHTML = `<div class="flex justify-between items-center mb-1 text-left px-1 font-bold pointer-events-none text-left"><span class="text-[10px] font-black ${isToday ? 'bg-indigo-600 text-white px-1.5 py-0.5 rounded-lg' : 'text-slate-500 dark:text-slate-400'}">${day}</span><button onclick="window.openModal('${dateStr}')" class="opacity-0 group-hover:opacity-100 text-indigo-400 text-[10px] font-bold pointer-events-auto"><i class="fas fa-plus"></i></button></div><div class="flex-1 space-y-[1px] overflow-visible" id="events-${dateStr}"></div>`;
+            let evs = window.marketingActions;
+            if (!window.activeFilters.includes('all')) evs = evs.filter(e => window.activeFilters.includes(e.campaignId?.toString()));
+            const fP = document.getElementById('advFilterPlatform').value;
+            const fF = document.getElementById('advFilterFormat').value;
+            const fO = document.getElementById('advFilterObjective').value;
+            if (fP !== 'all') evs = evs.filter(e => e.channel === fP);
+            if (fF !== 'all') evs = evs.filter(e => e.format === fF);
+            if (fO !== 'all') evs = evs.filter(e => e.objective === fO);
+            const container = dayEl.querySelector(`#events-${dateStr}`);
+            evs.filter(e => e.date === dateStr).forEach(event => {
+                const tag = document.createElement('div'); 
+                const isC = event.status === 'concluido';
+                const isX = event.status === 'cancelado';
+                const plt = window.platforms.find(p => p.id == event.channel) || { color: '#ccc', icon: 'fas fa-rocket' };
+                const obj = window.objectives.find(o => o.id == event.objective) || { icon: '🎯' };
+                const camp = window.campaigns.find(c => String(c.id) === String(event.campaignId));
+                tag.className = `event-tag ${isC ? 'completed' : ''} ${isX ? 'cancelled' : ''}`;
+                tag.draggable = true;
+                tag.setAttribute("ondragstart", `window.handleDragStart(event, '${event.id}')`);
+                tag.setAttribute("ondragend", "window.handleDragEnd(event)");
+                tag.style.borderLeftColor = plt.color; tag.style.borderRightColor = camp ? camp.color : 'transparent';
+                
+                if (!isX && !isC) {
+                    if (isD) { tag.style.backgroundColor = plt.color + '30'; tag.style.color = '#f8fafc'; }
+                    else { tag.style.backgroundColor = plt.color + '15'; tag.style.color = plt.color; }
+                }
+                
+                tag.onclick = () => window.openDetails(event.id);
+                tag.innerHTML = `
+                    <div class="tag-visual-content flex items-center overflow-hidden flex-1 font-bold pointer-events-none">
+                        <i class="${plt.icon} mr-1.5 text-[11px] opacity-100 shrink-0"></i>
+                        <span class="truncate flex-1 font-bold">${event.title}</span>
+                        <span style="font-size: 11px; margin-left: 2px;">${obj.icon}</span>
+                    </div>
+                    <div class="custom-tooltip">${event.title}</div>
+                `;
+                container.appendChild(tag);
+            });
+            calendarBody.appendChild(dayEl);
+        }
+        window.renderStatusCards();
+    };
+
+    window.renderStatusCards = () => {
+        const sRow = document.getElementById('campaignStatusRow'); if (!sRow) return;
+        if (window.activeFilters.length > 0 && !window.activeFilters.includes('all')) {
+            sRow.classList.remove('hidden'); let cards = '';
+            window.activeFilters.forEach(fId => {
+                const c = window.campaigns.find(c => String(c.id) === String(fId));
+                if(c) {
+                    const tasks = window.marketingActions.filter(a => String(a.campaignId) === String(fId));
+                    const done = tasks.filter(a => a.status === 'concluido').length;
+                    const pct = tasks.length > 0 ? Math.round((done/tasks.length)*100) : 0;
+                    cards += `<div class="bg-white dark:bg-slate-900 p-4 rounded-3xl border-2 shadow-sm border-l-[10px] text-left dark:border-slate-800 transition-colors" style="border-left-color: ${c.color}"><div class="flex justify-between items-start mb-2"><h3 class="text-[11px] font-black text-slate-800 dark:text-white uppercase font-bold text-left">${c.name}</h3><span class="text-[11px] font-black ${pct === 100 ? 'text-green-600' : 'text-indigo-600 dark:text-indigo-400'} font-bold">${pct}%</span></div><div class="progress-container"><div class="progress-bar" style="width: ${pct}%"></div></div></div>`;
+                }
+            });
+            sRow.innerHTML = cards;
+        } else sRow.classList.add('hidden');
+    };
+
+    window.updateDashboard = () => {
+        const start = document.getElementById('dashStartDate').value;
+        const end = document.getElementById('dashEndDate').value;
+        const todayStr = new Date().toLocaleDateString('sv-SE');
+        
+        let fil = window.marketingActions;
+        if (start) fil = fil.filter(a => a.date >= start); if (end) fil = fil.filter(a => a.date <= end);
+        
+        const ongoingCampIds = new Set(window.marketingActions.filter(a => a.status === 'planejado').map(a => a.campaignId).filter(id => id));
+        document.getElementById('statOngoingCampaigns').innerText = ongoingCampIds.size;
+        document.getElementById('statOngoingTasks').innerText = window.marketingActions.filter(a => a.status === 'planejado').length;
+
+        const doneFiltered = fil.filter(a => a.status === 'concluido');
+        document.getElementById('statCompletedFiltered').innerText = doneFiltered.length;
+        document.getElementById('statCompletedRate').innerText = `${fil.length > 0 ? Math.round((doneFiltered.length/fil.length)*100) : 0}% do total filtrado`;
+
+        const doneLate = doneFiltered.filter(a => {
+            const p = new Date(a.date + "T23:59:59");
+            const c = new Date(a.completionDate);
+            return c > p;
+        });
+        document.getElementById('statCompletedLate').innerText = doneLate.length;
+        document.getElementById('statCompletedLateRate').innerText = `${doneFiltered.length > 0 ? Math.round((doneLate.length/doneFiltered.length)*100) : 0}% das concluídas`;
+
+        const overdue = fil.filter(a => a.status === 'planejado' && a.date < todayStr);
+        document.getElementById('statOverdueNow').innerText = overdue.length;
+        document.getElementById('statCancelledFiltered').innerText = fil.filter(a => a.status === 'cancelado').length;
+
+        const onTimeCount = doneFiltered.length - doneLate.length;
+        document.getElementById('statOnTimeRate').innerText = `${doneFiltered.length > 0 ? Math.round((onTimeCount/doneFiltered.length)*100) : 100}%`;
+
+        const upcoming = window.marketingActions.filter(a => a.status === 'planejado' && a.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date));
+        if (upcoming.length > 0) {
+            document.getElementById('statNextTask').innerText = upcoming[0].title;
+            document.getElementById('statNextDate').innerText = new Date(upcoming[0].date + "T00:00").toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+        } else { document.getElementById('statNextTask').innerText = "Nenhuma"; document.getElementById('statNextDate').innerText = "---"; }
+
+        window.renderCharts(fil);
+    };
+
+    window.renderCharts = (fil) => {
+        if (window.chartPltInstance) window.chartPltInstance.destroy(); 
+        if (window.chartObjInstance) window.chartObjInstance.destroy();
+        if (window.chartStatusInstance) window.chartStatusInstance.destroy();
+        
+        const isD = document.body.classList.contains('dark');
+        const textColor = isD ? '#94a3b8' : '#64748b', gridColor = isD ? '#334155' : '#e2e8f0';
+        const todayStr = new Date().toLocaleDateString('sv-SE');
+
+        const statCounts = {
+            Concluídas: fil.filter(a => a.status === 'concluido').length,
+            Atrasadas: fil.filter(a => a.status === 'planejado' && a.date < todayStr).length,
+            Canceladas: fil.filter(a => a.status === 'cancelado').length,
+            Pendentes: fil.filter(a => a.status === 'planejado' && a.date >= todayStr).length
+        };
+
+        window.chartStatusInstance = new Chart(document.getElementById('chartStatus').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(statCounts),
+                datasets: [{
+                    data: Object.values(statCounts),
+                    backgroundColor: ['#10b981', '#ef4444', '#f43f5e', '#6366f1'],
+                    borderWidth: 0,
+                    hoverOffset: 15
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: textColor, padding: 20, font: { weight: '800', size: 10 } } } }, cutout: '70%' }
+        });
+
+        window.chartPltInstance = new Chart(document.getElementById('chartPlatforms').getContext('2d'), { 
+            type: 'bar', 
+            data: { labels: window.platforms.map(p => p.name), datasets: [{ label: 'Posts', data: window.platforms.map(p => fil.filter(a => a.channel === p.id).length), backgroundColor: window.platforms.map(p => p.color + '80'), borderColor: window.platforms.map(p => p.color), borderWidth: 2, borderRadius: 8 }] }, 
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: textColor }, grid: { display: false } }, y: { ticks: { color: textColor }, grid: { color: gridColor } } }, plugins: { legend: { display: false } } } 
+        });
+
+        window.chartObjInstance = new Chart(document.getElementById('chartObjectives').getContext('2d'), { 
+            type: 'doughnut', 
+            data: { labels: window.objectives.map(o => o.name), datasets: [{ data: window.objectives.map(o => fil.filter(a => a.objective === o.id).length), backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'], borderWidth: 0 }] }, 
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: textColor, font: { weight: '800', size: 10 } } } } } 
+        });
+    };
+
+    window.openDetails = (id) => {
+        const a = window.marketingActions.find(item => item.id == id); if (!a) return; 
+        window.currentAction = a; 
+        const plt = window.platforms.find(p => p.id == a.channel) || { color: '#ccc', icon: 'fas fa-rocket', name: 'Plataforma' }; 
+        const obj = window.objectives.find(o => o.id == a.objective) || { icon: '🎯', name: 'Objetivo' }; 
+        const todayStr = new Date().toLocaleDateString('sv-SE');
+        
+        let statusText = "Pendente";
+        let statusClass = "bg-indigo-100 text-indigo-600";
+        
+        if (a.status === 'concluido') {
+            const isLate = new Date(a.completionDate) > new Date(a.date + "T23:59:59");
+            statusText = isLate ? "Concluída após o prazo" : "Concluída";
+            statusClass = isLate ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600";
+        } else if (a.status === 'cancelado') {
+            statusText = "Cancelada";
+            statusClass = "bg-rose-100 text-rose-600";
+        } else if (a.date < todayStr) {
+            statusText = "Atrasada";
+            statusClass = "bg-red-100 text-red-600";
+        }
+
+        document.getElementById('detailsTitle').innerText = a.title; 
+        document.getElementById('detailsDate').innerText = new Date(a.date + "T00:00").toLocaleDateString('pt-BR'); 
+        document.getElementById('detailsDescription').innerText = a.description || 'Sem notas.';
+        
+        const pBadge = document.getElementById('detailsPlatformBadge');
+        pBadge.innerText = plt.name;
+        pBadge.style.backgroundColor = plt.color;
+        
+        const oBadge = document.getElementById('detailsObjectiveBadge');
+        oBadge.innerText = `${obj.icon} ${obj.name}`;
+        oBadge.style.backgroundColor = plt.color; 
+        
+        const fBadge = document.getElementById('detailsFormatBadge');
+        fBadge.innerText = a.format;
+        fBadge.style.backgroundColor = plt.color; 
+        
+        const sB = document.getElementById('detailsStatusBadge');
+        sB.innerText = statusText;
+        sB.className = `px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${statusClass}`;
+        
+        const cBtn = document.getElementById('detailsCompleteBtn');
+        const xBtn = document.getElementById('detailsCancelBtn');
+        
+        document.getElementById('detailsBtnLabel').innerText = (a.status === 'concluido') ? 'Reabrir Tarefa' : 'Concluir Tarefa';
+        cBtn.className = `w-full py-3 rounded-xl font-black text-xs uppercase shadow-md flex items-center justify-center gap-2 ${(a.status === 'concluido') ? 'bg-slate-100 text-slate-500' : 'bg-emerald-600 text-white'}`;
+        cBtn.onclick = () => window.toggleComplete(a.id);
+        
+        document.getElementById('detailsCancelBtnLabel').innerText = (a.status === 'cancelado') ? 'Ativar Tarefa' : 'Cancelar Tarefa';
+        xBtn.onclick = () => window.toggleCancel(a.id);
+
+        const camp = window.campaigns.find(c => String(c.id) === String(a.campaignId)); 
+        const cBadge = document.getElementById('detailsCampaignBadge');
+        if (camp) { 
+            cBadge.innerText = camp.name; 
+            cBadge.style.backgroundColor = camp.color; 
+            cBadge.style.color = camp.fontColor || '#ffffff'; 
+            cBadge.classList.remove('hidden'); 
+        } else { 
+            cBadge.classList.add('hidden'); 
+        }
+        
+        document.getElementById('detailsParticipantsContainer').classList.toggle('hidden', !a.participants);
+        document.getElementById('detailsParticipants').innerText = a.participants || '';
+        document.getElementById('detailsIcon').style.backgroundColor = plt.color;
+        document.getElementById('detailsIcon').innerHTML = `<i class="${plt.icon} fa-2x"></i>`;
+        document.getElementById('detailsModal').classList.add('active');
+    };
+
+    // --- FUNÇÃO DUPLICAR TAREFA ---
+    window.duplicateCurrentTask = () => {
+        const a = window.currentAction;
+        if (!a) return;
+        
+        window.closeDetails();
+        
+        // Abrir modal de criação zerando o ID de edição
+        document.getElementById('editingId').value = '';
+        document.getElementById('actionTitle').value = a.title + " (Cópia)";
+        document.getElementById('actionDate').value = a.date;
+        document.getElementById('actionChannel').value = a.channel;
+        document.getElementById('actionFormat').value = a.format;
+        document.getElementById('actionDescription').value = a.description || '';
+        document.getElementById('actionCampaignId').value = a.campaignId || '';
+        document.getElementById('actionParticipants').value = a.participants || '';
+        document.getElementById('actionObjective').value = a.objective || '';
+
+        document.getElementById('modalTitle').innerText = "Duplicar Postagem";
+        document.getElementById('eventModal').classList.add('active');
+    };
+
+    window.toggleComplete = async (id) => { 
+        if(!auth.currentUser) return; 
+        const a = window.marketingActions.find(item => item.id == id); if(!a) return; 
+        const isC = a.status !== 'concluido'; 
+        await updateDoc(getPubDoc('marketingActions', id), { 
+            status: isC ? 'concluido' : 'planejado', 
+            completionDate: isC ? new Date().toISOString() : null 
+        }).catch(() => {}); 
+        window.closeDetails(); 
+    };
+
+    window.toggleCancel = async (id) => {
+        if(!auth.currentUser) return;
+        const a = window.marketingActions.find(item => item.id == id); if(!a) return;
+        const isX = a.status !== 'cancelado';
+        await updateDoc(getPubDoc('marketingActions', id), {
+            status: isX ? 'cancelado' : 'planejado',
+            completionDate: null
+        }).catch(() => {});
+        window.closeDetails();
+    };
+
+    window.editPlatform = (id) => {
+        const p = window.platforms.find(plt => plt.id == id); if (!p) return;
+        document.getElementById('editingPlatformId').value = id; document.getElementById('pltName').value = p.name; document.getElementById('pltColor').value = p.color; window.selectIcon(p.icon); document.getElementById('btnSavePlt').innerText = "Atualizar Plataforma"; document.getElementById('btnCancelPlt').classList.remove('hidden');
+    };
+    window.resetPlatformForm = () => { document.getElementById('platformForm').reset(); document.getElementById('editingPlatformId').value = ""; document.getElementById('btnSavePlt').innerText = "Adicionar Plataforma"; document.getElementById('btnCancelPlt').classList.add('hidden'); };
+
+    window.openConfigModal = () => { document.getElementById('configModal').classList.add('active'); window.renderIconPicker(); window.renderConfigLists(); };
+    window.closeConfigModal = () => { document.getElementById('configModal').classList.remove('active'); window.resetPlatformForm(); };
+    
+    window.openCampaignModal = () => { 
+        document.getElementById('campaignModal').classList.add('active'); 
+        window.renderCampaignSelectors(); 
+    };
+    window.closeCampaignModal = () => { document.getElementById('campaignModal').classList.remove('active'); window.resetCampaignForm(); };
+    window.closeDetails = () => document.getElementById('detailsModal').classList.remove('active');
+    window.closeDeleteConfirm = () => document.getElementById('deleteConfirmModal').classList.remove('active');
+    window.closeModal = () => document.getElementById('eventModal').classList.remove('active');
+
+    window.openModal = (d = '') => { 
+        document.getElementById('editingId').value = ''; 
+        document.getElementById('eventForm').reset(); 
+        document.getElementById('actionDate').value = d || new Date().toLocaleDateString('sv-SE'); 
+        document.getElementById('modalTitle').innerText = "Agendar Postagem";
+        window.renderCampaignSelectors(); 
+        document.getElementById('eventModal').classList.add('active'); 
+    };
+    window.openEditCurrentAction = () => { const a = window.currentAction; if (!a) return; window.closeDetails(); document.getElementById('editingId').value = a.id; document.getElementById('actionTitle').value = a.title; document.getElementById('actionDate').value = a.date; document.getElementById('actionChannel').value = a.channel; document.getElementById('actionFormat').value = a.format; document.getElementById('actionDescription').value = a.description || ''; document.getElementById('actionCampaignId').value = a.campaignId || ''; document.getElementById('actionParticipants').value = a.participants || ''; document.getElementById('actionObjective').value = a.objective || ''; document.getElementById('modalTitle').innerText = "Editar Postagem"; document.getElementById('eventModal').classList.add('active'); };
+    window.deleteCurrentTask = () => { if (!window.currentAction) return; window.prepareDelete(window.currentAction.id, 'task'); window.closeDetails(); };
+    window.prepareDelete = (id, type) => { window.idToDelete = id; window.deleteType = type; document.getElementById('deleteConfirmModal').classList.add('active'); };
+    
+    window.initBindings = () => { 
+        document.getElementById('btnConfirmDelete').onclick = async () => { 
+            if(!auth.currentUser) return; const map = { camp: 'campaigns', plt: 'platforms', task: 'marketingActions', obj: 'objectives', fmt: 'formats' }; 
+            await deleteDoc(getPubDoc(map[window.deleteType], window.idToDelete)).catch(() => {}); window.closeDeleteConfirm(); 
+        }; 
+    };
+
+    window.renderIconPicker = () => { const grid = document.getElementById('iconPickerGrid'); if(grid) grid.innerHTML = iconLibrary.map(icon => `<div class="icon-option ${window.selectedPlatformIcon === icon ? 'selected' : ''}" onclick="window.selectIcon('${icon}')"><i class="${icon} fa-lg"></i></div>`).join(''); };
+    window.selectIcon = (i) => { window.selectedPlatformIcon = i; window.renderIconPicker(); };
+    window.switchConfigTab = (t) => { document.getElementById('config-platforms').classList.toggle('hidden', t !== 'platforms'); document.getElementById('config-formats').classList.toggle('hidden', t !== 'formats'); document.getElementById('config-objectives').classList.toggle('hidden', t !== 'objectives'); document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.getElementById(`tab-${t}`).classList.add('active'); };
+    window.resetAdvancedFilters = () => { document.getElementById('advFilterPlatform').value = 'all'; document.getElementById('advFilterFormat').value = 'all'; document.getElementById('advFilterObjective').value = 'all'; window.updateUI(); };
+    window.resetDashPeriod = () => { document.getElementById('dashStartDate').value = ''; document.getElementById('dashEndDate').value = ''; window.updateDashboard(); };
+    window.resetCampaignForm = () => { document.getElementById('campaignForm').reset(); document.getElementById('editingCampaignId').value = ''; document.getElementById('campaignModalTitle').innerText = 'Estratégias'; document.getElementById('submitCampBtn').innerText = 'Salvar'; };
+
+    window.renderLegend = () => { const l = document.getElementById('dynamicLegend'); if(!l) return; const pltHtml = window.platforms.map(p => `<div class="flex items-center gap-1.5 shrink-0 text-left"><i class="${p.icon}" style="color: ${p.color}"></i> ${p.name}</div>`).join(''); const objHtml = window.objectives.map(o => `<span class="shrink-0 text-left">${o.icon} ${o.name}</span>`).join(' | '); l.innerHTML = pltHtml + (pltHtml && objHtml ? `<div class="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-2 shrink-0"></div>` : '') + objHtml; }
+
+    window.editCampaign = (id) => { 
+        const c = window.campaigns.find(item => item.id == id); 
+        if (!c) return; 
+        document.getElementById('editingCampaignId').value = id; 
+        document.getElementById('campName').value = c.name; 
+        document.getElementById('campColor').value = c.color; 
+        document.getElementById('campFontColor').value = c.fontColor || '#ffffff'; 
+        document.getElementById('campObs').value = c.obs || ''; 
+        document.getElementById('campaignModalTitle').innerText = 'Editar Estratégia'; 
+        document.getElementById('submitCampBtn').innerText = 'Salvar'; 
+    };
+
+    onAuthStateChanged(auth, user => {
+        const login = document.getElementById('loginOverlay'), appC = document.getElementById('appContainer'), syncL = document.getElementById('loadingSync'), splash = document.getElementById('initialSplash');
+        if (user) { 
+            login.style.display = 'none'; 
+            appC.classList.remove('hidden'); 
+            appC.style.display = 'flex'; 
+            syncL.style.display = 'flex'; 
+            startSync(); 
+            window.initBindings(); 
+            window.switchView(window.currentView); 
+        } 
+        else { 
+            login.style.display = 'flex'; 
+            appC.classList.add('hidden'); 
+            appC.style.display = 'none'; 
+            syncL.style.display = 'none'; 
+            if (window.heartbeatInterval) clearInterval(window.heartbeatInterval); 
+        }
+        if(splash) { setTimeout(() => { splash.style.opacity = '0'; setTimeout(() => splash.remove(), 500); }, 800); }
+    });
+</script>
+
+</body>
+</html>
